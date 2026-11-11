@@ -4,6 +4,8 @@ Plan a fair monthly duty roster for a small team. Add staff and their contracted
 say how many people each shift needs per weekday, record leave and wishes, then generate a rota that shares
 good and bad shifts out fairly and respects rest time. Web app for desktop and phone, no build step.
 
+**Live:** https://jacques-van-rensburg-webdev.github.io/Staffy/
+
 Built from the Claude artifact "Shift Rota Planner".
 
 ## Run it
