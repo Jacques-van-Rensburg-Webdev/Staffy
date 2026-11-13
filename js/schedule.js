@@ -1,5 +1,5 @@
 // Scheduling: month context, the greedy generator with random restarts, and plan checks.
-import { monthDays, shiftGeom, fmtH, ruleOnDow, ruleText } from './util.js';
+import { monthDays, shiftGeom, fmtH, ruleOnDow, ruleText, posKey, positions } from './util.js';
 
 // Everything the generator and the screens need to know about a month.
 export function ctx(st) {
@@ -18,6 +18,21 @@ export function ctx(st) {
     const o = st.overrides[d.date];
     if (o && o[sh.id] != null) return +o[sh.id] || 0;
     return +((st.needs[sh.id] || [])[d.dow]) || 0;
+  };
+  // Places on a shift kept for a position: [{ key, name, n }]. They count within the headcount.
+  const posList = positions(st);
+  const staffPos = {};
+  for (const s of st.staff) staffPos[s.id] = posKey(s.position);
+  const posNeed = (d, sh) => {
+    const byPos = (st.posNeeds || {})[sh.id];
+    if (!byPos) return [];
+    let left = need(d, sh);
+    const out = [];
+    for (const p of posList) {
+      const n = Math.min(left, +((byPos[p.key] || [])[d.dow]) || 0);
+      if (n > 0) { out.push({ ...p, n }); left -= n; }
+    }
+    return out;
   };
   const cls = (d, sh) => {
     if (sh.tag === 'u' || (st.settings.weekendUndesirable && d.we)) return 'u';
@@ -89,7 +104,7 @@ export function ctx(st) {
   const avgPaid = shifts.length ? shifts.reduce((a, b) => a + b.paid, 0) / shifts.length : 8;
 
   return {
-    st, days, N, shifts, leave, need, cls, target, sumT, totU, totD, expU, expD,
+    st, days, N, shifts, leave, need, posList, staffPos, posNeed, cls, target, sumT, totU, totD, expU, expD,
     req, reqList, fixed, broken, allowed, blockedDay, needH, needSlots, avgPaid,
   };
 }
@@ -122,56 +137,71 @@ function runOnce(C, jit, rand) {
   }));
   const cells = {};
   let unfilled = 0;
+  let posGaps = 0;
   const rank = { u: 0, n: 1, d: 2 };
 
-  for (const day of C.days) {
+  // Give one place on a shift to the cheapest free person. With pos, only people of that position.
+  const fill = (day, sh, c, pos) => {
     const i = day.idx;
     const frac = (i + 1) / C.N;
+    let best = null;
+    let bc = Infinity;
+    const start = i * 24 + sh.startH;
+    for (const p of P) {
+      if (pos && C.staffPos[p.id] !== pos) continue;
+      if (p.w[i] || C.leave[p.id].has(day.date)) continue;
+      if (!C.allowed(p.id, day.date, sh.id)) continue;
+      if (start - p.lastEnd < minRest) continue;
+      let cons = 0;
+      for (let j = i - 1; j >= 0 && p.w[j]; j -= 1) cons += 1;
+      if (cons >= maxC) continue;
+      const unit = Math.max(sh.paid, 1);
+      let cost = 10 * ((p.h + sh.paid - p.t * frac) / unit);
+      const over = p.h + sh.paid - (p.t + sh.paid * 0.5);
+      if (over > 0) cost += (30 * over) / unit + 20;
+      if (c === 'u') cost += 8 * (p.u + 1 - C.expU[p.id] * frac);
+      if (c === 'd') cost += 8 * (p.d + 1 - C.expD[p.id] * frac);
+      const rs = C.req[`${p.id}|${day.date}`];
+      if (rs) {
+        for (const r of rs) {
+          if (r.kind === 'off') cost += 45;
+          else if (r.kind === 'want') cost += (!r.shiftId || r.shiftId === sh.id) ? -45 : 12;
+          else if (r.kind === 'avoid' && r.shiftId === sh.id) cost += 40;
+        }
+      }
+      cost += rand() * jit;
+      if (cost < bc) { bc = cost; best = p; }
+    }
+    if (!best) return false;
+    cells[`${best.id}|${day.date}`] = sh.id;
+    best.w[i] = true;
+    best.h += sh.paid;
+    best.lastEnd = start + sh.len;
+    if (c === 'u') best.u += 1;
+    else if (c === 'd') best.d += 1;
+    return true;
+  };
+
+  for (const day of C.days) {
     const order = C.shifts
       .map((sh) => ({ sh, c: C.cls(day, sh), r: rand() }))
       .sort((a, b) => rank[a.c] - rank[b.c] || a.r - b.r);
-    for (const { sh, c } of order) {
-      const n = C.need(day, sh);
-      for (let k = 0; k < n; k += 1) {
-        let best = null;
-        let bc = Infinity;
-        const start = i * 24 + sh.startH;
-        for (const p of P) {
-          if (p.w[i] || C.leave[p.id].has(day.date)) continue;
-          if (!C.allowed(p.id, day.date, sh.id)) continue;
-          if (start - p.lastEnd < minRest) continue;
-          let cons = 0;
-          for (let j = i - 1; j >= 0 && p.w[j]; j -= 1) cons += 1;
-          if (cons >= maxC) continue;
-          const unit = Math.max(sh.paid, 1);
-          let cost = 10 * ((p.h + sh.paid - p.t * frac) / unit);
-          const over = p.h + sh.paid - (p.t + sh.paid * 0.5);
-          if (over > 0) cost += (30 * over) / unit + 20;
-          if (c === 'u') cost += 8 * (p.u + 1 - C.expU[p.id] * frac);
-          if (c === 'd') cost += 8 * (p.d + 1 - C.expD[p.id] * frac);
-          const rs = C.req[`${p.id}|${day.date}`];
-          if (rs) {
-            for (const r of rs) {
-              if (r.kind === 'off') cost += 45;
-              else if (r.kind === 'want') cost += (!r.shiftId || r.shiftId === sh.id) ? -45 : 12;
-              else if (r.kind === 'avoid' && r.shiftId === sh.id) cost += 40;
-            }
-          }
-          cost += rand() * jit;
-          if (cost < bc) { bc = cost; best = p; }
+    // Position places first, on every shift of the day, so those people are not used up elsewhere.
+    for (const o of order) {
+      o.open = C.need(day, o.sh);
+      for (const p of C.posNeed(day, o.sh)) {
+        for (let k = 0; k < p.n; k += 1) {
+          if (fill(day, o.sh, o.c, p.key)) o.open -= 1;
+          else posGaps += 1; // the place stays open and goes to anyone below
         }
-        if (!best) { unfilled += 1; continue; }
-        cells[`${best.id}|${day.date}`] = sh.id;
-        best.w[i] = true;
-        best.h += sh.paid;
-        best.lastEnd = start + sh.len;
-        if (c === 'u') best.u += 1;
-        else if (c === 'd') best.d += 1;
       }
+    }
+    for (const o of order) {
+      for (let k = 0; k < o.open; k += 1) if (!fill(day, o.sh, o.c, '')) unfilled += 1;
     }
   }
 
-  let cost = unfilled * 1000;
+  let cost = unfilled * 1000 + posGaps * 400;
   for (const p of P) {
     const hd = (p.h - p.t) / C.avgPaid;
     cost += 3 * hd * hd + 4 * (p.u - C.expU[p.id]) ** 2 + 3 * (p.d - C.expD[p.id]) ** 2;
@@ -179,7 +209,7 @@ function runOnce(C, jit, rand) {
   for (const r of C.reqList) {
     if (!reqMet(r, cells[`${r.staffId}|${r.date}`])) cost += 6;
   }
-  return { cells, cost, unfilled };
+  return { cells, cost, unfilled, posGaps };
 }
 
 // Best of many attempts within about a second. Returns a plan object for S.plan.
@@ -245,15 +275,23 @@ export function evaluate(C, cells) {
     for (const sh of C.shifts) {
       const n = C.need(day, sh);
       need += n;
-      by[sh.id] = { need: n, have: 0 };
+      by[sh.id] = { need: n, have: 0, pos: C.posNeed(day, sh).map((p) => ({ key: p.key, name: p.name, need: p.n, have: 0 })) };
     }
     for (const s of C.st.staff) {
       const sid = cells[`${s.id}|${day.date}`];
-      if (sid && by[sid]) { by[sid].have += 1; have += 1; }
+      if (!sid || !by[sid]) continue;
+      by[sid].have += 1;
+      have += 1;
+      const p = by[sid].pos.find((x) => x.key === C.staffPos[s.id]);
+      if (p) p.have += 1;
     }
-    let short = 0;
-    for (const k in by) short += Math.max(0, by[k].need - by[k].have);
-    cover[day.date] = { need, have, short, by };
+    // short = empty places; posShort = places a required position does not hold.
+    let short = 0; let posShort = 0;
+    for (const k in by) {
+      short += Math.max(0, by[k].need - by[k].have);
+      for (const p of by[k].pos) posShort += Math.max(0, p.need - p.have);
+    }
+    cover[day.date] = { need, have, short, posShort, by };
   }
   return { issues, per, cover };
 }

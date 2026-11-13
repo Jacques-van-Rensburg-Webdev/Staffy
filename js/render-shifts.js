@@ -1,6 +1,6 @@
 // Shifts screen: shift types, default staff needed per weekday, rules, this month's calendar.
 import { ctx } from './schedule.js';
-import { DOW, WEEK, esc, fmtH, monthName, shiftClass, shiftGeom } from './util.js';
+import { DOW, WEEK, esc, fmtH, monthName, positions, shiftClass, shiftGeom } from './util.js';
 import { removeButton } from './render-shared.js';
 
 const TAGS = [['d', 'Desirable'], ['n', 'Neutral'], ['u', 'Undesirable']];
@@ -44,6 +44,29 @@ function weeklyNeeds(S) {
   </section>`;
 }
 
+function positionNeeds(S) {
+  const pos = positions(S);
+  let body;
+  if (!pos.length) {
+    body = `<p class="empty">Nobody has a position yet. Give people a position on the Staff tab, then set here how many each shift needs.</p>`;
+  } else {
+    let rows = '';
+    for (const sh of S.shifts) {
+      pos.forEach((p, i) => {
+        const n = ((S.posNeeds || {})[sh.id] || {})[p.key] || [];
+        const cells = WEEK.map((w) => `<td><input class="input input-xs input-num" type="number" min="0" id="pn-${sh.id}-${i}-${w}" data-pneed="${sh.id}" data-pos="${esc(p.key)}" data-dow="${w}" value="${+n[w] || 0}" aria-label="${esc(p.name)} on ${esc(sh.name)} ${DOW[w]}"></td>`).join('');
+        rows += `<tr><td class="cell-left"><span class="swatch swatch-shift ${shiftClass(sh)}"></span> ${esc(sh.name)}</td><td class="cell-left">${esc(p.name)}</td>${cells}</tr>`;
+      });
+    }
+    body = `<div class="scroll"><table class="table table-center"><thead><tr><th>Shift</th><th>Position</th>${WEEK.map((w) => `<th>${DOW[w]}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  return `<section class="span-4 card stack-1">
+    <h2 class="heading">Positions needed</h2>
+    <p class="hint">The least number of people of a position on each shift, per weekday. They are part of the staff needed above, not extra, so a number higher than the shift's headcount is cut to fit. 0 means anyone can fill the shift.</p>
+    ${body}
+  </section>`;
+}
+
 function monthCalendar(S, C) {
   const hasOverrides = Object.keys(S.overrides).some((k) => k.startsWith(S.month));
   let rows = '';
@@ -81,5 +104,5 @@ function rules(S) {
 export function renderShifts(S) {
   const C = ctx(S);
   // Desktop: default needs and rules sit side by side above the month calendar.
-  return shiftTypes(S) + weeklyNeeds(S) + rules(S) + monthCalendar(S, C);
+  return shiftTypes(S) + weeklyNeeds(S) + rules(S) + positionNeeds(S) + monthCalendar(S, C);
 }

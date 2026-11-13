@@ -31,7 +31,9 @@ Then open http://localhost:3000 (or :8000). On a desktop browser you get the wid
 - **Rota** – generates a month plan (best of many attempts within about a second), shows cover per day,
   rule conflicts in red, and a fairness table. Tap a cell to change a shift by hand. Export CSV or copy
   the table for a spreadsheet.
-- **Staff** – names and hours per month. Targets shrink for leave days if that rule is on.
+- **Staff** – names, positions (e.g. Nurse) and hours per month. Targets shrink for leave days if that rule is on.
+- **Positions** – on the Shifts tab, say how many people of a position each shift needs per weekday. The generator
+  fills those places first; the Cover row and a banner flag any shift missing a required position.
 - **Shifts** – shift types (times, break, desirable / neutral / undesirable, colour), default staff needed
   per weekday, per-day overrides for this month, and rules (minimum rest, max days in a row).
 - **Leave** – leave periods (never scheduled), one-off requests (day off, wants to work, avoid a shift) that the

@@ -22,6 +22,8 @@ export function blankState() {
     shifts: [{ ...SHIFT_EARLY }, { ...SHIFT_LATE }, { ...SHIFT_NIGHT }],
     // needs are indexed by getDay(): [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
     needs: { early: [1, 2, 2, 2, 2, 2, 1], late: [1, 1, 1, 1, 1, 1, 1], night: [1, 1, 1, 1, 1, 1, 1] },
+    // minimum people of a position per shift: { shiftId: { positionKey: [Sun … Sat] } }, part of the headcount above
+    posNeeds: {},
     overrides: {},
     leave: [],
     requests: [],
@@ -43,10 +45,12 @@ export function exampleState() {
     night: [1, 1, 1, 1, 1, 1, 1],
   };
   const names = [
-    ['Anna Weber', 160], ['Ben Okafor', 160], ['Carla Rossi', 120], ['David Krüger', 160],
-    ['Elif Yilmaz', 80], ['Felix Brandt', 140], ['Greta Lind', 160], ['Hamid Nasser', 100],
+    ['Anna Weber', 160, 'Nurse'], ['Ben Okafor', 160, 'Nurse'], ['Carla Rossi', 120, 'Assistant'], ['David Krüger', 160, 'Nurse'],
+    ['Elif Yilmaz', 80, 'Assistant'], ['Felix Brandt', 140, 'Assistant'], ['Greta Lind', 160, 'Nurse'], ['Hamid Nasser', 100, 'Assistant'],
   ];
-  st.staff = names.map(([name, hours], i) => ({ id: `s${i}`, name, hours }));
+  st.staff = names.map(([name, hours, position], i) => ({ id: `s${i}`, name, hours, position }));
+  // Every early and night shift needs at least one nurse.
+  st.posNeeds = { early: { nurse: [1, 1, 1, 1, 1, 1, 1] }, night: { nurse: [1, 1, 1, 1, 1, 1, 1] } };
   const D = (d) => `${m}-${pad(d)}`;
   st.leave = [
     { id: uid(), staffId: 's5', from: D(21), to: D(27), note: 'Holiday' },

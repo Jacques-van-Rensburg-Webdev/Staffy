@@ -13,10 +13,11 @@ export function csvText(S, sep) {
     const s = String(v);
     return sep === ',' && /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const rows = [['Staff', ...C.days.map((d) => `${DOW[d.dow].slice(0, 2)} ${d.day}`), 'Hours', 'Target']];
+  const rows = [['Staff', 'Position', ...C.days.map((d) => `${DOW[d.dow].slice(0, 2)} ${d.day}`), 'Hours', 'Target']];
   for (const s of S.staff) {
     rows.push([
       s.name,
+      String(s.position || '').trim(),
       ...C.days.map((d) => {
         const sh = shById[cells[`${s.id}|${d.date}`]];
         if (sh) return sh.code;

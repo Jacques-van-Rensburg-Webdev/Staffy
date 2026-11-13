@@ -86,3 +86,16 @@ export function ruleText(S, r) {
 
 // A recurring rule applies on a given getDay() value?
 export const ruleOnDow = (r, dow) => r.dow === '' || r.dow == null || +r.dow === dow;
+
+// Positions are free text on each person and are matched without regard to case or outer spaces.
+export const posKey = (p) => String(p ?? '').trim().toLowerCase();
+
+// Positions in use, in order of first appearance: [{ key, name }].
+export function positions(S) {
+  const seen = new Map();
+  for (const s of S.staff) {
+    const key = posKey(s.position);
+    if (key && !seen.has(key)) seen.set(key, { key, name: String(s.position).trim() });
+  }
+  return [...seen.values()];
+}

@@ -98,6 +98,7 @@ function onAction(S, a) {
     case 'del-shift':
       S.shifts = S.shifts.filter((s) => s.id !== id);
       delete S.needs[id];
+      delete S.posNeeds[id];
       break;
     case 'add-shift': {
       const nid = uid();
@@ -158,11 +159,15 @@ document.addEventListener('change', (e) => {
   if (d.staff) {
     const s = S.staff.find((x) => x.id === d.staff);
     if (!s) return;
-    s[d.f] = d.f === 'hours' ? Math.max(0, +el.value || 0) : el.value;
+    if (d.f === 'hours') s.hours = Math.max(0, +el.value || 0);
+    else s[d.f] = d.f === 'position' ? el.value.trim() : el.value;
   } else if (d.shift) {
     const s = S.shifts.find((x) => x.id === d.shift);
     if (!s) return;
     s[d.f] = d.f === 'brk' ? Math.max(0, +el.value || 0) : el.value;
+  } else if (d.pneed) {
+    const byPos = (S.posNeeds[d.pneed] = S.posNeeds[d.pneed] || {});
+    (byPos[d.pos] = byPos[d.pos] || [0, 0, 0, 0, 0, 0, 0])[+d.dow] = Math.max(0, +el.value || 0);
   } else if (d.need) {
     (S.needs[d.need] = S.needs[d.need] || [0, 0, 0, 0, 0, 0, 0])[+d.dow] = Math.max(0, +el.value || 0);
   } else if (d.ov) {
@@ -208,7 +213,7 @@ function submitForm(S, id) {
       el.reportValidity();
       return;
     }
-    S.staff.push({ id: uid(), name, hours: Math.max(0, +v('ns-hours') || 0) });
+    S.staff.push({ id: uid(), name, hours: Math.max(0, +v('ns-hours') || 0), position: v('ns-pos').trim() });
   } else if (id === 'add-leave') {
     const from = v('lv-f');
     let to = v('lv-t');

@@ -36,6 +36,7 @@ export function renderPlan(S, ui) {
   // Month card with actions
   const nIssues = Object.keys(E.issues).length;
   const nShort = Object.values(E.cover).reduce((a, c) => a + c.short, 0);
+  const nPos = Object.values(E.cover).reduce((a, c) => a + c.posShort, 0);
   let genLabel = 'Generate rota';
   if (hasPlan) genLabel = S.plan.edited && ui.confirmRegen ? 'Overwrite my edits?' : 'Regenerate rota';
   const hint = hasPlan
@@ -50,11 +51,12 @@ export function renderPlan(S, ui) {
     </div>
   </section>`;
 
-  if (hasPlan && (nIssues || nShort)) {
+  if (hasPlan && (nIssues || nShort || nPos)) {
     let msg = '';
     if (nShort) msg += `<b>${nShort} shift${nShort > 1 ? 's' : ''} unfilled.</b> `;
+    if (nPos) msg += `<b>${nPos} place${nPos > 1 ? 's' : ''} not covered by the required position.</b> See the Cover row. `;
     if (nIssues) msg += `<b>${nIssues} rule conflict${nIssues > 1 ? 's' : ''}</b> marked in red (leave, rest time or days in a row).`;
-    if (nShort && !nIssues) msg += 'Not enough available people. Check leave, rest time or add staff.';
+    if (nShort && !nIssues && !nPos) msg += 'Not enough available people. Check leave, rest time or add staff.';
     out += `<div class="span-4 banner banner-bad"><span>${msg}</span></div>`;
   }
 
@@ -66,7 +68,8 @@ export function renderPlan(S, ui) {
   out += `<th class="rota-total" scope="col">Hours</th></tr></thead><tbody>`;
 
   for (const s of S.staff) {
-    out += `<tr><th class="rota-name" scope="row" title="${esc(s.name)}">${esc(s.name)}</th>`;
+    const position = String(s.position || '').trim();
+    out += `<tr><th class="rota-name" scope="row" title="${esc(position ? `${s.name} · ${position}` : s.name)}">${esc(s.name)}${position ? `<span class="rota-name-position">${esc(position)}</span>` : ''}</th>`;
     for (const d of C.days) {
       const key = `${s.id}|${d.date}`;
       const sh = shById[cells[key]];
@@ -114,8 +117,12 @@ export function renderPlan(S, ui) {
     const shortBy = Object.entries(c.by)
       .filter(([, v]) => v.have < v.need)
       .map(([k, v]) => `${shById[k].code} −${v.need - v.have}`);
-    const cls = c.short ? 'is-short' : c.have > c.need ? 'is-over' : '';
-    const title = `${c.have} of ${c.need} filled${shortBy.length ? ` · short: ${shortBy.join(', ')}` : ''}`;
+    const posBy = [];
+    for (const [k, v] of Object.entries(c.by)) {
+      for (const p of v.pos) if (p.have < p.need) posBy.push(`${shById[k].code} ${p.have} of ${p.need} ${p.name}`);
+    }
+    const cls = c.short || c.posShort ? 'is-short' : c.have > c.need ? 'is-over' : '';
+    const title = `${c.have} of ${c.need} filled${shortBy.length ? ` · short: ${shortBy.join(', ')}` : ''}${posBy.length ? ` · position missing: ${posBy.join(', ')}` : ''}`;
     let text = String(c.need);
     if (hasPlan) text = c.short ? `−${c.short}` : `${c.have}/${c.need}`;
     out += `<td class="${cls}" title="${esc(title)}">${text}</td>`;
