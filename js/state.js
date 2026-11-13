@@ -3,6 +3,7 @@ import { uid, pad, nextMonth } from './util.js';
 
 const STORAGE_KEY = 'staffy.state';
 const TAB_KEY = 'staffy.tab';
+const VIEW_KEY = 'staffy.view';
 const SAVE_DELAY = 700;
 
 export const TABS = ['plan', 'staff', 'shifts', 'leave'];
@@ -129,5 +130,21 @@ export function storeTab(tab) {
     localStorage.setItem(TAB_KEY, tab);
   } catch {
     // Storage unavailable: the tab just isn't remembered.
+  }
+}
+
+// Rota view: 'grid' (people down, days across) or 'calendar'.
+export function readView() {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'calendar' ? 'calendar' : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
+export function storeView(view) {
+  try {
+    localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    // Storage unavailable: the view just isn't remembered.
   }
 }

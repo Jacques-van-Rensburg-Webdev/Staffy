@@ -1,6 +1,6 @@
 // Entry point: wires the header, tab bar, screens and all event handling together.
 import { initGridOverlay } from './grid-overlay.js';
-import { blankState, changed, getState, load, onStatus, readTab, setState, storeTab } from './state.js';
+import { blankState, changed, getState, load, onStatus, readTab, readView, setState, storeTab } from './state.js';
 import { generate } from './schedule.js';
 import { renderPlan } from './render-plan.js';
 import { renderStaff } from './render-staff.js';
@@ -9,6 +9,7 @@ import { renderLeave } from './render-leave.js';
 import { exampleBanner } from './render-shared.js';
 import { hidePopover, initPopover, openPopover, pickShift } from './popover.js';
 import { copyTable, exportCSV } from './export.js';
+import { initCalendar } from './calendar.js';
 import { COLOR_COUNT, monthDays, uid } from './util.js';
 
 const SCREENS = { plan: renderPlan, staff: renderStaff, shifts: renderShifts, leave: renderLeave };
@@ -19,7 +20,8 @@ const main = document.getElementById('main');
 const statusEl = document.getElementById('status');
 const monthEl = document.getElementById('month');
 const tabLinks = [...document.querySelectorAll('.app-tabbar [data-tab]')];
-const ui = { tab: 'plan', confirmRegen: false };
+// view: rota as grid or calendar; day: date open in the calendar; move: shift being moved there
+const ui = { tab: 'plan', confirmRegen: false, view: 'grid', day: null, move: null };
 
 function setStatus(text, isError) {
   statusEl.textContent = text;
@@ -53,6 +55,7 @@ function render() {
 function showTab(tab) {
   ui.tab = tab;
   ui.confirmRegen = false;
+  ui.move = null;
   storeTab(tab);
   hidePopover();
   render();
@@ -191,6 +194,8 @@ monthEl.addEventListener('change', (e) => {
   if (!/^\d{4}-\d{2}$/.test(e.target.value)) return;
   getState().month = e.target.value;
   ui.confirmRegen = false;
+  ui.day = null;
+  ui.move = null;
   update();
 });
 
@@ -256,10 +261,12 @@ document.addEventListener('submit', (e) => {
 function init() {
   initGridOverlay();
   initPopover();
+  initCalendar({ ui, getState, render, update });
   onStatus(setStatus);
   load();
   const fromHash = tabFromHash();
   ui.tab = fromHash || readTab();
+  ui.view = readView();
   if (!fromHash) window.history.replaceState(null, '', `#/${ui.tab}`);
   window.addEventListener('hashchange', () => showTab(tabFromHash() || 'plan'));
   render();

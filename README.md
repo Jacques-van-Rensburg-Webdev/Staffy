@@ -31,6 +31,9 @@ Then open http://localhost:3000 (or :8000). On a desktop browser you get the wid
 - **Rota** – generates a month plan (best of many attempts within about a second), shows cover per day,
   rule conflicts in red, and a fairness table. Tap a cell to change a shift by hand. Export CSV or copy
   the table for a spreadsheet.
+- **Calendar view** – switch the Rota tab from Grid to Calendar to see the month week by week, with a coloured tag per
+  person on each day. Tap a day to see its shifts; **Move** takes a person's shift to another day (if they already
+  work that day the two days are exchanged), **Change** picks another shift or off. With a mouse, drag a tag to a day.
 - **Staff** – names, positions (e.g. Nurse) and hours per month. Targets shrink for leave days if that rule is on.
 - **Positions** – on the Shifts tab, say how many people of a position each shift needs per weekday. The generator
   fills those places first; the Cover row and a banner flag any shift missing a required position.
@@ -61,6 +64,9 @@ js/app.js               entry: routing, rendering, events
 js/state.js             state, example data, saving to localStorage
 js/schedule.js          month context, generator, plan evaluation
 js/render-plan.js       Rota screen
+js/render-calendar.js   Rota screen, calendar view: calendar, moving bar, day card
+js/calendar.js          calendar taps and drag and drop
+js/moves.js             move a person's shift to another day
 js/render-staff.js      Staff screen
 js/render-shifts.js     Shifts screen
 js/render-leave.js      Leave screen
